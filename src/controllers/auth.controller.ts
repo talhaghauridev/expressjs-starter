@@ -5,8 +5,7 @@ import { AuthService } from '@/services/auth.service';
 import ApiResponse from '@/utils/api-response';
 import asyncHandler from '@/utils/async-handler';
 import { DeviceInfo, getDeviceInfo } from '@/utils/get-device-info';
-import logger from '@/utils/logger';
-import { getFacebookAuthUrl, getGoogleAuthUrl, isValidRedirectUrl } from '@/utils/oauth';
+import { getFacebookAuthUrl, getGoogleAuthUrl, getValidatedRedirectUrl } from '@/utils/oauth';
 import { decodeState, encodeState } from '@/utils/state-helper';
 import requestIp from 'request-ip';
 
@@ -145,18 +144,12 @@ export const googleAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
-  let finalRedirect = env.FRONTEND_URL;
-
-  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
-    finalRedirect = redirectUrl as string;
-  } else if (redirectUrl) {
-    logger.warn('Invalid redirect URL attempt', {
-      requestedUrl: redirectUrl,
-      clientIp,
-      userAgent: req.headers['user-agent'],
-      endpoint: 'google-auth',
-    });
-  }
+  const finalRedirect = getValidatedRedirectUrl(
+    redirectUrl as string,
+    deviceInfo.platform,
+    req,
+    'google-auth'
+  );
   const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getGoogleAuthUrl(encodedState);
@@ -168,18 +161,12 @@ export const googleAuth = asyncHandler(async (req, res, next) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
-  let finalRedirect = env.FRONTEND_URL;
-
-  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
-    finalRedirect = redirectUrl as string;
-  } else if (redirectUrl) {
-    logger.warn('Invalid redirect URL attempt', {
-      requestedUrl: redirectUrl,
-      clientIp,
-      userAgent: req.headers['user-agent'],
-      endpoint: 'google-auth',
-    });
-  }
+  const finalRedirect = getValidatedRedirectUrl(
+    redirectUrl as string,
+    deviceInfo.platform,
+    req,
+    'google-auth'
+  );
   const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
 
@@ -232,18 +219,12 @@ export const facebookAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
-  let finalRedirect = env.FRONTEND_URL;
-
-  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
-    finalRedirect = redirectUrl as string;
-  } else if (redirectUrl) {
-    logger.warn('Invalid redirect URL attempt', {
-      requestedUrl: redirectUrl,
-      clientIp,
-      userAgent: req.headers['user-agent'],
-      endpoint: 'facebook-auth',
-    });
-  }
+  const finalRedirect = getValidatedRedirectUrl(
+    redirectUrl as string,
+    deviceInfo.platform,
+    req,
+    'facebook-auth'
+  );
   const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getFacebookAuthUrl(encodedState);
@@ -255,20 +236,12 @@ export const facebookAuth = asyncHandler(async (req, res, next) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
-
-  let finalRedirect = env.FRONTEND_URL;
-
-  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
-    finalRedirect = redirectUrl as string;
-  } else if (redirectUrl) {
-    logger.warn('Invalid redirect URL attempt', {
-      requestedUrl: redirectUrl,
-      clientIp,
-      userAgent: req.headers['user-agent'],
-      endpoint: 'facebook-auth',
-    });
-  }
-
+  const finalRedirect = getValidatedRedirectUrl(
+    redirectUrl as string,
+    deviceInfo.platform,
+    req,
+    'facebook-auth'
+  );
   const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
 

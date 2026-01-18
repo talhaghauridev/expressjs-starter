@@ -23,7 +23,7 @@ const router = Router();
 router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
 router.get('/verify-email', validate(verifyEmailSchema), authController.verifyEmail);
-router.post('/verify-otp', validate(verifyEmailOTPSchema), authController.verifyEmailOTP);
+router.post('/verify-email-otp', validate(verifyEmailOTPSchema), authController.verifyEmailOTP);
 router.post(
   '/resend-verification',
   validate(resendVerificationSchema),
