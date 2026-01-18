@@ -1,23 +1,23 @@
+import passport from '@/config/passport.config';
+import { AuthProviderType } from '@/constants/auth';
+import { env } from '@/env';
 import { AuthService } from '@/services/auth.service';
 import ApiResponse from '@/utils/api-response';
 import asyncHandler from '@/utils/async-handler';
 import { DeviceInfo, getDeviceInfo } from '@/utils/get-device-info';
+import logger from '@/utils/logger';
+import { getFacebookAuthUrl, getGoogleAuthUrl, isValidRedirectUrl } from '@/utils/oauth';
 import { decodeState, encodeState } from '@/utils/state-helper';
-import { NextFunction, Request, Response } from 'express';
 import requestIp from 'request-ip';
-import passport from '@/config/passport.config';
-import { env } from '@/env';
-import { AuthProviderType } from '@/constants/auth';
-import { getFacebookAuthUrl, getGoogleAuthUrl } from '@/utils/oauth';
 
-export const register = asyncHandler(async (req: Request, res: Response) => {
+export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   const deviceInfo = getDeviceInfo(req);
   const { message } = await AuthService.register(name, email, password, deviceInfo);
   return ApiResponse.created(res, {}, message);
 });
 
-export const login = asyncHandler(async (req: Request, res: Response) => {
+export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
@@ -32,7 +32,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   return ApiResponse.success(res, { accessToken, refreshToken, user }, 'Login successfully');
 });
 
-export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+export const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.query as { token: string };
   const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
@@ -50,7 +50,7 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
   );
 });
 
-export const verifyEmailOTP = asyncHandler(async (req: Request, res: Response) => {
+export const verifyEmailOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
   const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
@@ -69,7 +69,7 @@ export const verifyEmailOTP = asyncHandler(async (req: Request, res: Response) =
   );
 });
 
-export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
+export const resendVerification = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const deviceInfo = getDeviceInfo(req);
 
@@ -78,7 +78,7 @@ export const resendVerification = asyncHandler(async (req: Request, res: Respons
   return ApiResponse.success(res, {}, message);
 });
 
-export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const deviceInfo = getDeviceInfo(req);
 
@@ -87,32 +87,32 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   return ApiResponse.success(res, {}, message);
 });
 
-export const verifyResetPasswordOTP = asyncHandler(async (req: Request, res: Response) => {
+export const verifyResetPasswordOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
   const { resetToken, message } = await AuthService.verifyResetPasswordOTP(email, otp);
   return ApiResponse.success(res, { resetToken }, message);
 });
 
-export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+export const resetPassword = asyncHandler(async (req, res) => {
   const { token, password } = req.body;
   const { message } = await AuthService.resetPassword(token, password);
   return ApiResponse.success(res, {}, message);
 });
 
-export const resetPasswordOTP = asyncHandler(async (req: Request, res: Response) => {
+export const resetPasswordOTP = asyncHandler(async (req, res) => {
   const { resetToken, password } = req.body;
   const { message } = await AuthService.resetPasswordOTP(resetToken, password);
   return ApiResponse.success(res, {}, message);
 });
 
-export const resendResetPassword = asyncHandler(async (req: Request, res: Response) => {
+export const resendResetPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const deviceInfo = getDeviceInfo(req);
   const { message } = await AuthService.resendResetPassword(email, deviceInfo.platform);
   return ApiResponse.success(res, {}, message);
 });
 
-export const refresh = asyncHandler(async (req: Request, res: Response) => {
+export const refresh = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
   const { accessToken, refreshToken: newRefreshToken } = await AuthService.refresh(refreshToken);
@@ -124,7 +124,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
   );
 });
 
-export const logout = asyncHandler(async (req: Request, res: Response) => {
+export const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
   const { message } = await AuthService.logout(refreshToken);
@@ -132,7 +132,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
   return ApiResponse.success(res, null, message);
 });
 
-export const logoutAll = asyncHandler(async (req: Request, res: Response) => {
+export const logoutAll = asyncHandler(async (req, res) => {
   // @ts-ignore
   const userId = req.user.id!;
 
@@ -141,24 +141,46 @@ export const logoutAll = asyncHandler(async (req: Request, res: Response) => {
   return ApiResponse.success(res, null, message);
 });
 
-export const googleAuthUrl = asyncHandler(async (req: Request, res: Response) => {
+export const googleAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
+  let finalRedirect = env.FRONTEND_URL;
 
-  const state = { deviceInfo, clientIp, redirectUrl };
+  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
+    finalRedirect = redirectUrl as string;
+  } else if (redirectUrl) {
+    logger.warn('Invalid redirect URL attempt', {
+      requestedUrl: redirectUrl,
+      clientIp,
+      userAgent: req.headers['user-agent'],
+      endpoint: 'google-auth',
+    });
+  }
+  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getGoogleAuthUrl(encodedState);
 
   return ApiResponse.success(res, { authUrl });
 });
 
-export const googleAuth = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+export const googleAuth = asyncHandler(async (req, res, next) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
+  let finalRedirect = env.FRONTEND_URL;
 
-  const state = { deviceInfo, clientIp, redirectUrl };
+  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
+    finalRedirect = redirectUrl as string;
+  } else if (redirectUrl) {
+    logger.warn('Invalid redirect URL attempt', {
+      requestedUrl: redirectUrl,
+      clientIp,
+      userAgent: req.headers['user-agent'],
+      endpoint: 'google-auth',
+    });
+  }
+  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
 
   passport.authenticate('google', {
@@ -167,108 +189,130 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response, next:
   })(req, res, next);
 });
 
-export const googleCallback = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { state } = req.query;
+export const googleCallback = asyncHandler(async (req, res, next) => {
+  const { state } = req.query;
 
-    let redirectUrl = env.FRONTEND_URL;
-    let deviceInfo: DeviceInfo;
-    let clientIp: string;
+  let redirectUrl = env.FRONTEND_URL;
+  let deviceInfo: DeviceInfo;
+  let clientIp: string;
 
-    if (state && typeof state === 'string') {
-      const decoded = decodeState(state);
+  if (state && typeof state === 'string') {
+    const decoded = decodeState(state);
+    if (decoded) {
       redirectUrl = decoded.redirectUrl || env.FRONTEND_URL;
       deviceInfo = decoded.deviceInfo;
       clientIp = decoded.clientIp;
     }
-
-    passport.authenticate('google', { session: false }, async (err: any, profile: any) => {
-      try {
-        if (err || !profile) {
-          return res.redirect(`${redirectUrl}?error=google_auth_failed`);
-        }
-
-        const result = await AuthService.handleOAuthLogin(
-          profile,
-          AuthProviderType.GOOGLE,
-          deviceInfo,
-          clientIp
-        );
-
-        return res.redirect(
-          `${redirectUrl}?access_token=${result.accessToken}&refresh_token=${result.refreshToken}`
-        );
-      } catch (error: any) {
-        const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
-        return res.redirect(`${redirectUrl}?error=${errorMessage}`);
-      }
-    })(req, res, next);
   }
-);
 
-export const facebookAuthUrl = asyncHandler(async (req: Request, res: Response) => {
+  passport.authenticate('google', { session: false }, async (err: any, profile: any) => {
+    try {
+      if (err || !profile) {
+        return res.redirect(`${redirectUrl}?error=google_auth_failed`);
+      }
+
+      const result = await AuthService.handleOAuthLogin(
+        profile,
+        AuthProviderType.GOOGLE,
+        deviceInfo,
+        clientIp
+      );
+
+      return res.redirect(
+        `${redirectUrl}?access_token=${result.accessToken}&refresh_token=${result.refreshToken}`
+      );
+    } catch (error: any) {
+      const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
+      return res.redirect(`${redirectUrl}?error=${errorMessage}`);
+    }
+  })(req, res, next);
+});
+
+export const facebookAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
   const clientIp = requestIp.getClientIp(req)!;
+  let finalRedirect = env.FRONTEND_URL;
 
-  const state = { deviceInfo, clientIp, redirectUrl };
+  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
+    finalRedirect = redirectUrl as string;
+  } else if (redirectUrl) {
+    logger.warn('Invalid redirect URL attempt', {
+      requestedUrl: redirectUrl,
+      clientIp,
+      userAgent: req.headers['user-agent'],
+      endpoint: 'facebook-auth',
+    });
+  }
+  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getFacebookAuthUrl(encodedState);
 
   return ApiResponse.success(res, { authUrl });
 });
 
-export const facebookAuth = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { redirectUrl } = req.query;
-    const deviceInfo = getDeviceInfo(req);
-    const clientIp = requestIp.getClientIp(req)!;
+export const facebookAuth = asyncHandler(async (req, res, next) => {
+  const { redirectUrl } = req.query;
+  const deviceInfo = getDeviceInfo(req);
+  const clientIp = requestIp.getClientIp(req)!;
 
-    const state = { deviceInfo, clientIp, redirectUrl };
-    const encodedState = encodeState(state);
+  let finalRedirect = env.FRONTEND_URL;
 
-    passport.authenticate('facebook', {
-      state: encodedState,
-      session: false,
-    })(req, res, next);
+  if (redirectUrl && isValidRedirectUrl(redirectUrl as string)) {
+    finalRedirect = redirectUrl as string;
+  } else if (redirectUrl) {
+    logger.warn('Invalid redirect URL attempt', {
+      requestedUrl: redirectUrl,
+      clientIp,
+      userAgent: req.headers['user-agent'],
+      endpoint: 'facebook-auth',
+    });
   }
-);
 
-export const facebookCallback = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { state } = req.query;
+  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
+  const encodedState = encodeState(state);
 
-    let redirectUrl = env.FRONTEND_URL;
-    let deviceInfo: DeviceInfo;
-    let clientIp: string;
+  passport.authenticate('facebook', {
+    state: encodedState,
+    session: false,
+  })(req, res, next);
+});
 
-    if (state && typeof state === 'string') {
-      const decoded = decodeState(state);
+export const facebookCallback = asyncHandler(async (req, res, next) => {
+  const { state } = req.query;
+
+  let redirectUrl = env.FRONTEND_URL;
+  let deviceInfo: DeviceInfo;
+  let clientIp: string;
+
+  if (state && typeof state === 'string') {
+    const decoded = decodeState(state);
+    if (decoded) {
       redirectUrl = decoded.redirectUrl || env.FRONTEND_URL;
       deviceInfo = decoded.deviceInfo;
       clientIp = decoded.clientIp;
     }
-
-    passport.authenticate('facebook', { session: false }, async (err: any, profile: any) => {
-      try {
-        if (err || !profile) {
-          return res.redirect(`${redirectUrl}?error=facebook_auth_failed`);
-        }
-
-        const result = await AuthService.handleOAuthLogin(
-          profile,
-          AuthProviderType.FACEBOOK,
-          deviceInfo,
-          clientIp
-        );
-
-        return res.redirect(
-          `${redirectUrl}?access_token=${result.accessToken}&refresh_token=${result.refreshToken}`
-        );
-      } catch (error: any) {
-        const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
-        return res.redirect(`${redirectUrl}?error=${errorMessage}`);
-      }
-    })(req, res, next);
   }
-);
+
+  passport.authenticate('facebook', { session: false }, async (err: any, profile: any) => {
+    try {
+      if (err || !profile) {
+        return res.redirect(`${redirectUrl}?error=facebook_auth_failed`);
+      }
+
+      const result = await AuthService.handleOAuthLogin(
+        profile,
+        AuthProviderType.FACEBOOK,
+        deviceInfo,
+        clientIp
+      );
+
+      return res.redirect(
+        `${redirectUrl}?access_token=${result.accessToken}&refresh_token=${result.refreshToken}`
+      );
+    } catch (error: any) {
+      const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
+      return res.redirect(`${redirectUrl}?error=${errorMessage}`);
+    }
+  })(req, res, next);
+});

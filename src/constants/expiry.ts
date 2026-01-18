@@ -1,8 +1,6 @@
-import { env } from '@/env';
-
 export const ExpiryTime = {
-  ACCESS_TOKEN: env.ACCESS_TOKEN_EXPIRE,
-  REFRESH_TOKEN: env.REFRESH_TOKEN_EXPIRE,
+  ACCESS_TOKEN: '10h',
+  REFRESH_TOKEN: '30d',
   EMAIL_VERIFICATION_LINK: '24h',
   EMAIL_VERIFICATION_OTP: '15m',
   PASSWORD_RESET_LINK: '1h',

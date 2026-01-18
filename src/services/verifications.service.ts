@@ -6,6 +6,12 @@ import { parseTimeToMs } from '@/utils/parse-time';
 import { sendEmail } from '@/utils/send-email';
 import crypto from 'crypto';
 
+const generateSecureOTP = (): string => {
+  const bytes = crypto.randomBytes(4);
+  const num = bytes.readUInt32BE(0) % 900000;
+  return (num + 100000).toString();
+};
+
 export class VerificationService {
   static async sendVerification(
     userId: string,
@@ -40,7 +46,7 @@ export class VerificationService {
   }
 
   private static async sendVerificationOTP(userId: string, email: string) {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = generateSecureOTP();
     const expiresAt = new Date(Date.now() + parseTimeToMs(ExpiryTime.EMAIL_VERIFICATION_OTP));
 
     await VerificationRepository.createVerification(
@@ -74,7 +80,7 @@ export class VerificationService {
       subject = 'Reset Your Password';
       message = `Click this link to reset your password: ${env.FRONTEND_URL}/reset-password?token=${token}`;
     } else {
-      token = Math.floor(100000 + Math.random() * 900000).toString();
+      token = generateSecureOTP();
       expiresAt = new Date(Date.now() + parseTimeToMs(ExpiryTime.EMAIL_VERIFICATION_OTP));
       subject = 'Your Password Reset Code';
       message = `Your password reset code is: ${token}`;

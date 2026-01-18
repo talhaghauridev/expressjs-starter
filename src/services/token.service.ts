@@ -7,6 +7,8 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 
 type TokenPayload = Pick<User, 'id' | 'name' | 'email' | 'role' | 'provider'>;
 
+const PASSWORD_RESET_SECRET = env.PASSWORD_RESET_TOKEN_SECRET;
+
 export class TokenService {
   static generateAccessToken(payload: TokenPayload) {
     return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
@@ -38,14 +40,14 @@ export class TokenService {
       type: VerificationType.PASSWORD_RESET,
     };
 
-    return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
+    return jwt.sign(payload, PASSWORD_RESET_SECRET, {
       expiresIn: ExpiryTime.PASSWORD_RESET_TOKEN,
     });
   }
 
   static verifyPasswordResetToken(token: string): { userId: string } | null {
     try {
-      const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as any;
+      const decoded = jwt.verify(token, PASSWORD_RESET_SECRET) as any;
 
       if (decoded.type !== VerificationType.PASSWORD_RESET) {
         return null;

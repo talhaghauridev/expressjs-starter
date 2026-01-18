@@ -1,5 +1,5 @@
 import { SelectFields } from '@/types';
-import { getTableColumns } from 'drizzle-orm';
+import { getColumns } from 'drizzle-orm';
 
 export const normalizeSelect = <T>(select?: SelectFields<T>) => {
   if (!select || Object.keys(select).length === 0) {
@@ -25,7 +25,7 @@ export const buildReturning = <T>(table: any, select?: SelectFields<T>) => {
     return result;
   }
 
-  const allColumns = getTableColumns(table);
+  const allColumns = getColumns(table);
   const result: any = {};
   for (const key in allColumns) {
     if (select[key as keyof T] !== false) {

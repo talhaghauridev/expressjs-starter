@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import 'dotenv-flow/config';
+import { z } from 'zod';
 import { AuthCallbacks } from './constants/auth';
 
 const envSchema = z.object({
@@ -7,30 +7,37 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4001),
   DATABASE_URL: z.string().nonempty(),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('http'),
-  CORS_ALLOWED_ORIGINS: z.string().default(' * '),
+
+  CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  ALLOWED_MOBILE_SCHEMES: z.string().default('expo'),
+
   ACCESS_TOKEN_SECRET: z.string().nonempty(),
-  ACCESS_TOKEN_EXPIRE: z.string().default('10h'),
   REFRESH_TOKEN_SECRET: z.string().nonempty(),
-  REFRESH_TOKEN_EXPIRE: z.string().default('30d'),
+  PASSWORD_RESET_TOKEN_SECRET: z.string().nonempty(),
+
+  APP_NAME: z.string(),
   FRONTEND_URL: z.url().default('http://localhost:3000'),
   BACKEND_URL: z.url().default('http://localhost:4000'),
-  APP_NAME: z.string().default('Template'),
+
   GOOGLE_CLIENT_ID: z.string().nonempty(),
   GOOGLE_CLIENT_SECRET: z.string().nonempty(),
   GOOGLE_CALLBACK_URL: z.string().default(AuthCallbacks.GOOGLE),
+
   FACEBOOK_CLIENT_ID: z.string().nonempty(),
   FACEBOOK_CLIENT_SECRET: z.string().nonempty(),
   FACEBOOK_CALLBACK_URL: z.string().default(AuthCallbacks.FACEBOOK),
+
   SMTP_SERVICE: z.string().nonempty().default('gmail'),
   SMTP_PASSWORD: z.string().nonempty(),
   SMTP_MAIL: z.string().nonempty(),
+
   CLOUDINARY_CLOUD_NAME: z.string().nonempty(),
   CLOUDINARY_API_KEY: z.string().nonempty(),
   CLOUDINARY_API_SECRET: z.string().nonempty(),
+
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.string().default('6379'),
   REDIS_PASSWORD: z.string().optional(),
-  REDIS_TTL: z.coerce.number().default(3600),
   REDIS_URL: z.string().nonempty(),
 });
 
