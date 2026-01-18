@@ -132,8 +132,7 @@ export const logout = asyncHandler(async (req, res) => {
 });
 
 export const logoutAll = asyncHandler(async (req, res) => {
-  // @ts-ignore
-  const userId = req.user.id!;
+  const userId = req.user?.id!;
 
   const { message } = await AuthService.logoutAll(userId);
 

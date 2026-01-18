@@ -15,7 +15,7 @@ const envSchema = z.object({
   REFRESH_TOKEN_SECRET: z.string().nonempty(),
   PASSWORD_RESET_TOKEN_SECRET: z.string().nonempty(),
 
-  APP_NAME: z.string(),
+  APP_NAME: z.string().nonempty(),
   FRONTEND_URL: z.url().default('http://localhost:3000'),
   BACKEND_URL: z.url().default('http://localhost:4000'),
 
