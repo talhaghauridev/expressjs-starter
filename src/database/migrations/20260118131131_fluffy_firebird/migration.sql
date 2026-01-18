@@ -1,0 +1,1 @@
+ALTER TABLE "users" DROP CONSTRAINT "custom_auth_password_check", ADD CONSTRAINT "custom_auth_password_check" CHECK ("provider" != 'custom' OR "password" IS NOT NULL);
