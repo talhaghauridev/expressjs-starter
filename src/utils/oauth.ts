@@ -1,5 +1,9 @@
 import passport from '@/config/passport.config';
+import { PlatformType } from '@/constants/auth';
 import { env } from '@/env';
+import logger from './logger';
+import requestIp from 'request-ip';
+import { Request } from 'express';
 
 export const getGoogleAuthUrl = (encodedState: string): string => {
   const strategy = (passport as any)._strategies['google'] as any;
@@ -53,10 +57,14 @@ const getMobileSchemes = (): string[] => {
   return schemes;
 };
 
-export const isValidRedirectUrl = (url: string): boolean => {
+export const isValidRedirectUrl = (url: string, platform: string): boolean => {
   if (!url || typeof url !== 'string') return false;
 
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+  if (platform === PlatformType.WEB) {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return false;
+    }
+
     try {
       const { origin } = new URL(url);
       return getWebOrigins().includes(origin);
@@ -65,11 +73,38 @@ export const isValidRedirectUrl = (url: string): boolean => {
     }
   }
 
-  if (!url.includes('://')) return false;
+  if (platform === PlatformType.MOBILE) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return false;
+    }
 
-  const [scheme, path] = url.split('://');
+    if (!url.includes('://')) return false;
 
-  if (!scheme || !path) return false;
+    const [scheme, path] = url.split('://');
+    if (!scheme || !path) return false;
 
-  return getMobileSchemes().includes(scheme.toLowerCase());
+    return getMobileSchemes().includes(scheme.toLowerCase());
+  }
+
+  return false;
+};
+
+export const getValidatedRedirectUrl = (
+  redirectUrl: string | undefined,
+  platform: string,
+  req: Request,
+  endpoint: string
+): string => {
+  if (redirectUrl && isValidRedirectUrl(redirectUrl, platform)) {
+    return redirectUrl;
+  }
+  if (redirectUrl) {
+    logger.warn('Invalid redirect URL attempt', {
+      requestedUrl: redirectUrl,
+      clientIp: requestIp.getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      endpoint,
+    });
+  }
+  return env.FRONTEND_URL;
 };
