@@ -1,5 +1,5 @@
 import { AuthProviderType, AvailableAuthProviders, AvailableUserRoles } from '@/constants/auth';
-import { timestamps } from '@/utils/timestamps-helper';
+import { timestamps } from '@/utils/schema-helpers';
 import { sql } from 'drizzle-orm';
 import {
   boolean,

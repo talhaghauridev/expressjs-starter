@@ -1,9 +1,11 @@
 import passport from '@/config/passport.config';
 import { PlatformType } from '@/constants/auth';
 import { env } from '@/env';
-import logger from './logger';
-import requestIp from 'request-ip';
+import crypto from 'crypto';
 import { Request } from 'express';
+import requestIp from 'request-ip';
+import logger from './logger';
+const STATE_SECRET = env.ACCESS_TOKEN_SECRET;
 
 export const getGoogleAuthUrl = (encodedState: string): string => {
   const strategy = (passport as any)._strategies['google'] as any;
@@ -107,4 +109,29 @@ export const getValidatedRedirectUrl = (
     });
   }
   return env.FRONTEND_URL;
+};
+
+const createSignature = (data: string): string => {
+  return crypto.createHmac('sha256', STATE_SECRET).update(data).digest('hex');
+};
+
+export const encodeState = (state: any): string => {
+  const data = JSON.stringify(state);
+  const signature = createSignature(data);
+  return Buffer.from(JSON.stringify({ data, signature })).toString('base64');
+};
+
+export const decodeState = (encodedState: string): any | null => {
+  try {
+    const { data, signature } = JSON.parse(Buffer.from(encodedState, 'base64').toString());
+    const expectedSignature = createSignature(data);
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      return null;
+    }
+
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
 };

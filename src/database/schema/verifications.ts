@@ -1,5 +1,5 @@
 import { AvailablePlatforms, AvailableVerifications } from '@/constants/auth';
-import { timestamps } from '@/utils/timestamps-helper';
+import { timestamps } from '@/utils/schema-helpers';
 import { index, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './users';
 

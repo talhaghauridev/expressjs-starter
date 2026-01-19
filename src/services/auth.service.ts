@@ -14,11 +14,11 @@ import { VerificationRepository } from '@/repositories/verifications.repository'
 import ApiError from '@/utils/api-error';
 import { DeviceInfo, formatDeviceInfo } from '@/utils/get-device-info';
 import { getLocationFromIp } from '@/utils/get-location';
-import { parseTimeToMs } from '@/utils/parse-time';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { TokenService } from './token.service';
 import { VerificationService } from './verifications.service';
 import logger from '@/utils/logger';
+import { parseTimeToMs } from '@/utils/helpers';
 
 export class AuthService {
   static async register(name: string, email: string, password: string, deviceInfo: DeviceInfo) {

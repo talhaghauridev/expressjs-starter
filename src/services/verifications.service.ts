@@ -2,7 +2,7 @@ import { AvailablePlatforms, PlatformType, VerificationType } from '@/constants/
 import { ExpiryTime } from '@/constants/expiry';
 import { env } from '@/env';
 import { VerificationRepository } from '@/repositories/verifications.repository';
-import { parseTimeToMs } from '@/utils/parse-time';
+import { parseTimeToMs } from '@/utils/helpers';
 import { sendEmail } from '@/utils/send-email';
 import crypto from 'crypto';
 

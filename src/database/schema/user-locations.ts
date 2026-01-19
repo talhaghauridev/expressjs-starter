@@ -1,5 +1,5 @@
 import { AvailableLocationTypes } from '@/constants/auth';
-import { timestamps } from '@/utils/timestamps-helper';
+import { timestamps } from '@/utils/schema-helpers';
 import { index, pgEnum, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { platformEnum } from './verifications';

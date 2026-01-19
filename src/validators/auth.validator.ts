@@ -1,5 +1,5 @@
 import { ApiMessages } from '@/constants/api-messages';
-import { createSchema } from '@/utils/zod-schema-helper';
+import { createSchema } from '@/utils/validation-helpers';
 import { z } from 'zod';
 
 export const registerSchema = createSchema({

@@ -5,8 +5,13 @@ import { AuthService } from '@/services/auth.service';
 import ApiResponse from '@/utils/api-response';
 import asyncHandler from '@/utils/async-handler';
 import { DeviceInfo, getDeviceInfo } from '@/utils/get-device-info';
-import { getFacebookAuthUrl, getGoogleAuthUrl, getValidatedRedirectUrl } from '@/utils/oauth';
-import { decodeState, encodeState } from '@/utils/state-helper';
+import {
+  getFacebookAuthUrl,
+  getGoogleAuthUrl,
+  getValidatedRedirectUrl,
+  decodeState,
+  encodeState,
+} from '@/utils/oauth-helpers';
 import requestIp from 'request-ip';
 
 export const register = asyncHandler(async (req, res) => {
