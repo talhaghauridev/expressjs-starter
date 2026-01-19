@@ -19,6 +19,7 @@ const AuthProviderType = {
 const UserRoles = {
   ADMIN: 'admin',
   USER: 'user',
+  MODERATOR: 'moderator',
 } as const;
 
 const VerificationType = {
