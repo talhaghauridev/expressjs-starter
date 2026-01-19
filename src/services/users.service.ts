@@ -5,7 +5,7 @@ import { UserRepository } from '@/repositories/users.repository';
 import ApiError from '@/utils/api-error';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { StorageService } from './storage.service';
-import { getUpdatedFields } from '@/utils/helpers';
+import { getUpdatedFields, isEmptyObject } from '@/utils/helpers';
 export class UsersService {
   static async getProfile(userId: string) {
     const user = await UserRepository.findById(userId, { password: false });
@@ -26,7 +26,7 @@ export class UsersService {
 
     const updated = getUpdatedFields(user, data);
 
-    if (!updated) {
+    if (isEmptyObject(updated)) {
       return { user };
     }
 

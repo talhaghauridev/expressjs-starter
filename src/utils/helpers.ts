@@ -19,3 +19,6 @@ export function getUpdatedFields<T>(current: T, updates: Partial<T>): Partial<T>
   }
   return changed;
 }
+export function isEmptyObject(obj: object): boolean {
+  return Object.keys(obj).length === 0;
+}
