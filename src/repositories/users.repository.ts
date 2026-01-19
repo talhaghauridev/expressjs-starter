@@ -2,7 +2,7 @@ import { db } from '@/database/db';
 import { users, type InsertUser, type User } from '@/database/schema';
 import { SelectFields } from '@/types';
 import { buildReturning, normalizeSelect } from '@/utils/repository-helpers';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 export class UserRepository {
   static async create(data: InsertUser, select?: SelectFields<User>) {
@@ -37,16 +37,6 @@ export class UserRepository {
     });
   }
 
-  static async findByEmailWithLocations(email: string, select?: SelectFields<User>) {
-    return await db.query.users.findFirst({
-      where: { email },
-      columns: normalizeSelect(select),
-      with: {
-        locations: true,
-      },
-    });
-  }
-
   static async update(id: string, data: Partial<InsertUser>, select?: SelectFields<User>) {
     const [updated] = await db
       .update(users)
@@ -58,5 +48,63 @@ export class UserRepository {
 
   static async delete(id: string): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  static async findAll(
+    options: { page: number; limit: number; role?: string; search?: string },
+    select?: SelectFields<User>
+  ) {
+    const offset = (options.page - 1) * options.limit;
+
+    let whereClause: any = {};
+
+    if (options.role) {
+      whereClause.role = options.role;
+    }
+
+    if (options.search) {
+      whereClause.OR = [
+        { name: { ilike: `%${options.search}%` } },
+        { email: { ilike: `%${options.search}%` } },
+      ];
+    }
+
+    return await db.query.users.findMany({
+      where: Object.keys(whereClause).length > 0 ? whereClause : undefined,
+      columns: normalizeSelect(select),
+      limit: options.limit,
+      offset,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  static async count(filters?: { role?: string }) {
+    const conditions = [];
+    if (filters?.role) conditions.push(eq(users.role, filters.role));
+
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(conditions.length ? and(...conditions) : undefined);
+
+    return Number(result[0]?.count ?? 0);
+  }
+
+  static async countByRole() {
+    const result = await db
+      .select({
+        role: users.role,
+        count: sql<number>`count(*)`,
+      })
+      .from(users)
+      .groupBy(users.role);
+
+    return result.reduce(
+      (acc, row) => {
+        acc[row.role] = Number(row.count);
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 }
