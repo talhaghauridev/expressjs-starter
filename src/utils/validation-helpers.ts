@@ -18,31 +18,21 @@ export const createSchema = (schema: SchemaInput): ValidationSchema => {
   const result: ValidationSchema = {};
 
   if (schema.body) {
-    result.body =
-      schema.body instanceof z.ZodObject
-        ? z.strictObject(schema.body.shape)
-        : z.strictObject(schema.body);
+    result.body = schema.body instanceof z.ZodObject ? schema.body : z.strictObject(schema.body);
   }
 
   if (schema.query) {
-    result.query =
-      schema.query instanceof z.ZodObject
-        ? z.looseObject(schema.query.shape)
-        : z.looseObject(schema.query);
+    result.query = schema.query instanceof z.ZodObject ? schema.query : z.looseObject(schema.query);
   }
 
   if (schema.params) {
     result.params =
-      schema.params instanceof z.ZodObject
-        ? z.strictObject(schema.params.shape)
-        : z.strictObject(schema.params);
+      schema.params instanceof z.ZodObject ? schema.params : z.strictObject(schema.params);
   }
 
   if (schema.headers) {
     result.headers =
-      schema.headers instanceof z.ZodObject
-        ? z.looseObject(schema.headers.shape)
-        : z.looseObject(schema.headers);
+      schema.headers instanceof z.ZodObject ? schema.headers : z.looseObject(schema.headers);
   }
 
   return result;
