@@ -15,7 +15,8 @@ export class StorageService {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: folderName,
-          resource_type: 'auto',
+          resource_type: 'image',
+          format: 'jpg',
           transformation: [{ width: 500, height: 500 }],
         },
         (error, result) => {
@@ -33,6 +34,14 @@ export class StorageService {
   }
 
   static extractPublicId(url: string): string | null {
+    if (!this.isCloudinaryUrl(url)) {
+      return null;
+    }
     return _extractPublicId(url);
+  }
+
+  static isCloudinaryUrl(url: string): boolean {
+    if (!url) return false;
+    return url.includes('res.cloudinary.com') || url.includes('cloudinary.com');
   }
 }
