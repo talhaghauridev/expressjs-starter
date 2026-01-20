@@ -3,6 +3,7 @@ import { authenticate } from '@/middlewares/auth.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import {
   forgotPasswordSchema,
+  googleTokenSchema,
   loginSchema,
   logoutSchema,
   oauthSchema,
@@ -55,6 +56,7 @@ router.post('/logout-all', authenticate, authController.logoutAll);
 router.get('/google/url', validate(oauthSchema), authController.googleAuthUrl);
 router.get('/google', validate(oauthSchema), authController.googleAuth);
 router.get('/google/callback', authController.googleCallback);
+router.post('/google/token', validate(googleTokenSchema), authController.googleToken);
 
 router.get('/facebook/url', validate(oauthSchema), authController.facebookAuthUrl);
 router.get('/facebook', validate(oauthSchema), authController.facebookAuth);

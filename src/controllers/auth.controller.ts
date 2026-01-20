@@ -219,6 +219,20 @@ export const googleCallback = asyncHandler(async (req, res, next) => {
   })(req, res, next);
 });
 
+export const googleToken = asyncHandler(async (req, res) => {
+  const { idToken } = req.body;
+  const deviceInfo = getDeviceInfo(req);
+  const clientIp = requestIp.getClientIp(req)!;
+
+  const { accessToken, refreshToken, user } = await AuthService.verifyGoogleToken(
+    idToken,
+    deviceInfo,
+    clientIp
+  );
+
+  return ApiResponse.success(res, { accessToken, refreshToken, user }, 'Login successfully');
+});
+
 export const facebookAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);

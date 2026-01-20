@@ -1,3 +1,4 @@
+import { googleOAuthClient } from '@/clients/google-oauth';
 import {
   AuthProviderType,
   AvailableAuthProviders,
@@ -7,6 +8,7 @@ import {
   VerificationType,
 } from '@/constants/auth';
 import { ExpiryTime } from '@/constants/expiry';
+import { env } from '@/env';
 import { SessionRepository } from '@/repositories/sessions.repository';
 import { UserLocationRepository } from '@/repositories/user-locations.repository';
 import { UserRepository } from '@/repositories/users.repository';
@@ -685,6 +687,32 @@ export class AuthService {
       default:
         throw ApiError.badRequest(`Unsupported provider: ${provider}`);
     }
+  }
+
+  static async verifyGoogleToken(idToken: string, deviceInfo: DeviceInfo, clientIp: string) {
+    let payload;
+    try {
+      const ticket = await googleOAuthClient.verifyIdToken({
+        idToken,
+        audience: env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      throw ApiError.badRequest('Invalid Google token');
+    }
+
+    if (!payload || !payload.email) {
+      throw ApiError.badRequest('Invalid token payload');
+    }
+
+    const profile = {
+      id: payload.sub,
+      emails: [{ value: payload.email }],
+      displayName: payload.name || '',
+      photos: [{ value: payload.picture || null }],
+    };
+
+    return await this.handleOAuthLogin(profile, AuthProviderType.GOOGLE, deviceInfo, clientIp);
   }
 
   public static excludePassword<T extends { password?: string | null }>(

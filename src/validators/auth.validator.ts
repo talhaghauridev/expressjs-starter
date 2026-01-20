@@ -116,14 +116,14 @@ export const resetPasswordSchema = createSchema({
 });
 
 export const verifyResetPasswordOTPSchema = createSchema({
-  body: z.strictObject({
+  body: {
     email: z.email({ error: ApiMessages.VALIDATION.INVALID_EMAIL }),
     otp: z
       .string({ error: ApiMessages.VALIDATION.REQUIRED('OTP') })
       .trim()
       .length(6, { error: 'OTP must be 6 characters' })
       .regex(/^\d+$/, { error: 'OTP must contain only digits' }),
-  }),
+  },
 });
 
 export const resetPasswordOTPSchema = createSchema({
@@ -156,5 +156,14 @@ export const resetPasswordOTPSchema = createSchema({
 export const resendResetPasswordSchema = createSchema({
   body: {
     email: z.email({ error: ApiMessages.VALIDATION.INVALID_EMAIL }),
+  },
+});
+
+export const googleTokenSchema = createSchema({
+  body: {
+    idToken: z
+      .string({ error: ApiMessages.VALIDATION.REQUIRED('IdToken') })
+      .trim()
+      .min(1, { error: ApiMessages.VALIDATION.REQUIRED('IdToken') }),
   },
 });
