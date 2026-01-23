@@ -12,7 +12,6 @@ import {
   decodeState,
   encodeState,
 } from '@/utils/oauth-helpers';
-import requestIp from 'request-ip';
 
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
@@ -23,29 +22,18 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
 
-  const { accessToken, refreshToken, user } = await AuthService.login(
-    email,
-    password,
-    deviceInfo,
-    clientIp!
-  );
+  const { accessToken, refreshToken, user } = await AuthService.login(email, password, deviceInfo);
 
   return ApiResponse.success(res, { accessToken, refreshToken, user }, 'Login successfully');
 });
 
 export const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.query as { token: string };
-  const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
 
-  const { accessToken, refreshToken, user } = await AuthService.verifyEmail(
-    token,
-    deviceInfo,
-    clientIp!
-  );
+  const { accessToken, refreshToken, user } = await AuthService.verifyEmail(token, deviceInfo);
 
   return ApiResponse.success(
     res,
@@ -56,14 +44,12 @@ export const verifyEmail = asyncHandler(async (req, res) => {
 
 export const verifyEmailOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
-  const clientIp = requestIp.getClientIp(req);
   const deviceInfo = getDeviceInfo(req);
 
   const { accessToken, refreshToken, user } = await AuthService.verifyEmailOTP(
     email,
     otp,
-    deviceInfo,
-    clientIp!
+    deviceInfo
   );
 
   return ApiResponse.success(
@@ -147,14 +133,13 @@ export const logoutAll = asyncHandler(async (req, res) => {
 export const googleAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
-  const clientIp = requestIp.getClientIp(req)!;
   const finalRedirect = getValidatedRedirectUrl(
     redirectUrl as string,
     deviceInfo.platform,
     req,
     'google-auth'
   );
-  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
+  const state = { deviceInfo, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getGoogleAuthUrl(encodedState);
 
@@ -164,14 +149,13 @@ export const googleAuthUrl = asyncHandler(async (req, res) => {
 export const googleAuth = asyncHandler(async (req, res, next) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
-  const clientIp = requestIp.getClientIp(req)!;
   const finalRedirect = getValidatedRedirectUrl(
     redirectUrl as string,
     deviceInfo.platform,
     req,
     'google-auth'
   );
-  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
+  const state = { deviceInfo, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
 
   passport.authenticate('google', {
@@ -185,14 +169,12 @@ export const googleCallback = asyncHandler(async (req, res, next) => {
 
   let redirectUrl = env.FRONTEND_URL;
   let deviceInfo: DeviceInfo;
-  let clientIp: string;
 
   if (state && typeof state === 'string') {
     const decoded = decodeState(state);
     if (decoded) {
       redirectUrl = decoded.redirectUrl || env.FRONTEND_URL;
       deviceInfo = decoded.deviceInfo;
-      clientIp = decoded.clientIp;
     }
   }
 
@@ -205,8 +187,7 @@ export const googleCallback = asyncHandler(async (req, res, next) => {
       const result = await AuthService.handleOAuthLogin(
         profile,
         AuthProviderType.GOOGLE,
-        deviceInfo,
-        clientIp
+        deviceInfo
       );
 
       return res.redirect(
@@ -222,12 +203,10 @@ export const googleCallback = asyncHandler(async (req, res, next) => {
 export const googleToken = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
   const deviceInfo = getDeviceInfo(req);
-  const clientIp = requestIp.getClientIp(req)!;
 
   const { accessToken, refreshToken, user } = await AuthService.verifyGoogleToken(
     idToken,
-    deviceInfo,
-    clientIp
+    deviceInfo
   );
 
   return ApiResponse.success(res, { accessToken, refreshToken, user }, 'Login successfully');
@@ -236,14 +215,13 @@ export const googleToken = asyncHandler(async (req, res) => {
 export const facebookAuthUrl = asyncHandler(async (req, res) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
-  const clientIp = requestIp.getClientIp(req)!;
   const finalRedirect = getValidatedRedirectUrl(
     redirectUrl as string,
     deviceInfo.platform,
     req,
     'facebook-auth'
   );
-  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
+  const state = { deviceInfo, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
   const authUrl = getFacebookAuthUrl(encodedState);
 
@@ -253,14 +231,13 @@ export const facebookAuthUrl = asyncHandler(async (req, res) => {
 export const facebookAuth = asyncHandler(async (req, res, next) => {
   const { redirectUrl } = req.query;
   const deviceInfo = getDeviceInfo(req);
-  const clientIp = requestIp.getClientIp(req)!;
   const finalRedirect = getValidatedRedirectUrl(
     redirectUrl as string,
     deviceInfo.platform,
     req,
     'facebook-auth'
   );
-  const state = { deviceInfo, clientIp, redirectUrl: finalRedirect };
+  const state = { deviceInfo, redirectUrl: finalRedirect };
   const encodedState = encodeState(state);
 
   passport.authenticate('facebook', {
@@ -274,14 +251,12 @@ export const facebookCallback = asyncHandler(async (req, res, next) => {
 
   let redirectUrl = env.FRONTEND_URL;
   let deviceInfo: DeviceInfo;
-  let clientIp: string;
 
   if (state && typeof state === 'string') {
     const decoded = decodeState(state);
     if (decoded) {
       redirectUrl = decoded.redirectUrl || env.FRONTEND_URL;
       deviceInfo = decoded.deviceInfo;
-      clientIp = decoded.clientIp;
     }
   }
 
@@ -294,8 +269,7 @@ export const facebookCallback = asyncHandler(async (req, res, next) => {
       const result = await AuthService.handleOAuthLogin(
         profile,
         AuthProviderType.FACEBOOK,
-        deviceInfo,
-        clientIp
+        deviceInfo
       );
 
       return res.redirect(

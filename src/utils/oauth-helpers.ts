@@ -3,7 +3,6 @@ import { PlatformType } from '@/constants/auth';
 import { env } from '@/env';
 import crypto from 'crypto';
 import { Request } from 'express';
-import requestIp from 'request-ip';
 import logger from './logger';
 const STATE_SECRET = env.ACCESS_TOKEN_SECRET;
 
@@ -103,7 +102,6 @@ export const getValidatedRedirectUrl = (
   if (redirectUrl) {
     logger.warn('Invalid redirect URL attempt', {
       requestedUrl: redirectUrl,
-      clientIp: requestIp.getClientIp(req),
       userAgent: req.headers['user-agent'],
       endpoint,
     });

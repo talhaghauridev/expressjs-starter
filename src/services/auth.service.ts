@@ -3,19 +3,16 @@ import {
   AuthProviderType,
   AvailableAuthProviders,
   AvailablePlatforms,
-  LocationType,
   PlatformType,
   VerificationType,
 } from '@/constants/auth';
 import { ExpiryTime } from '@/constants/expiry';
 import { env } from '@/env';
 import { SessionRepository } from '@/repositories/sessions.repository';
-import { UserLocationRepository } from '@/repositories/user-locations.repository';
 import { UserRepository } from '@/repositories/users.repository';
 import { VerificationRepository } from '@/repositories/verifications.repository';
 import ApiError from '@/utils/api-error';
 import { DeviceInfo, formatDeviceInfo } from '@/utils/get-device-info';
-import { getLocationFromIp } from '@/utils/get-location';
 import { parseTimeToMs } from '@/utils/helpers';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { TokenService } from './token.service';
@@ -71,7 +68,7 @@ export class AuthService {
     };
   }
 
-  static async login(email: string, password: string, deviceInfo: DeviceInfo, clientIp: string) {
+  static async login(email: string, password: string, deviceInfo: DeviceInfo) {
     const user = await UserRepository.findByEmail(email);
 
     if (!user || user.provider !== AuthProviderType.CUSTOM || user.isVerified === false) {
@@ -92,8 +89,6 @@ export class AuthService {
       provider: user.provider,
     });
 
-    const location = await getLocationFromIp(clientIp);
-
     const session = await SessionRepository.create(
       {
         userId: user.id,
@@ -104,19 +99,6 @@ export class AuthService {
       { refreshToken: true }
     );
 
-    await UserLocationRepository.upsertLastLogin(
-      user.id,
-      {
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { userId: true }
-    );
-
     return {
       accessToken,
       refreshToken: session.refreshToken,
@@ -124,7 +106,7 @@ export class AuthService {
     };
   }
 
-  static async verifyEmail(token: string, deviceInfo: DeviceInfo, clientIp: string) {
+  static async verifyEmail(token: string, deviceInfo: DeviceInfo) {
     const verification = await VerificationRepository.findByToken(token);
 
     if (!verification) {
@@ -159,8 +141,6 @@ export class AuthService {
       provider: user.provider,
     });
 
-    const location = await getLocationFromIp(clientIp);
-
     const session = await SessionRepository.create(
       {
         userId: user.id,
@@ -171,19 +151,6 @@ export class AuthService {
       { refreshToken: true }
     );
 
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { userId: true }
-    );
     return {
       accessToken,
       refreshToken: session.refreshToken,
@@ -191,12 +158,7 @@ export class AuthService {
     };
   }
 
-  static async verifyEmailOTP(
-    email: string,
-    otp: string,
-    deviceInfo: DeviceInfo,
-    clientIp: string
-  ) {
+  static async verifyEmailOTP(email: string, otp: string, deviceInfo: DeviceInfo) {
     const verification = await VerificationRepository.findByToken(otp);
 
     if (!verification) {
@@ -238,8 +200,6 @@ export class AuthService {
       provider: user.provider,
     });
 
-    const location = await getLocationFromIp(clientIp);
-
     const session = await SessionRepository.create(
       {
         userId: user.id,
@@ -248,20 +208,6 @@ export class AuthService {
         expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
       },
       { refreshToken: true }
-    );
-
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { userId: true }
     );
 
     return {
@@ -484,8 +430,7 @@ export class AuthService {
   static async handleOAuthLogin(
     profile: any,
     provider: (typeof AvailableAuthProviders)[number],
-    deviceInfo: DeviceInfo,
-    clientIp: string
+    deviceInfo: DeviceInfo
   ) {
     const normalized = this.normalizeOAuthProfile(profile, provider);
 
@@ -532,22 +477,6 @@ export class AuthService {
           { refreshToken: true }
         );
 
-        const location = await getLocationFromIp(clientIp);
-
-        await UserLocationRepository.create(
-          {
-            userId: updatedUser.id,
-            type: LocationType.REGISTRATION,
-            country: location.country,
-            city: location.city,
-            ip: clientIp,
-            platform: deviceInfo.platform,
-            device: deviceInfo.device,
-            browser: deviceInfo.browser,
-          },
-          { id: true }
-        );
-
         return {
           accessToken,
           refreshToken,
@@ -580,21 +509,6 @@ export class AuthService {
         { refreshToken: true }
       );
 
-      const location = await getLocationFromIp(clientIp);
-
-      await UserLocationRepository.upsertLastLogin(
-        existingUser.id,
-        {
-          country: location.country,
-          city: location.city,
-          ip: clientIp,
-          platform: deviceInfo.platform,
-          device: deviceInfo.device,
-          browser: deviceInfo.browser,
-        },
-        { id: true }
-      );
-
       return {
         accessToken,
         refreshToken,
@@ -613,22 +527,6 @@ export class AuthService {
         isVerified: true,
       },
       { password: false }
-    );
-
-    const location = await getLocationFromIp(clientIp);
-
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { id: true }
     );
 
     const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
@@ -689,7 +587,7 @@ export class AuthService {
     }
   }
 
-  static async verifyGoogleToken(idToken: string, deviceInfo: DeviceInfo, clientIp: string) {
+  static async verifyGoogleToken(idToken: string, deviceInfo: DeviceInfo) {
     let payload;
     try {
       const ticket = await googleOAuthClient.verifyIdToken({
@@ -712,7 +610,7 @@ export class AuthService {
       photos: [{ value: payload.picture || null }],
     };
 
-    return await this.handleOAuthLogin(profile, AuthProviderType.GOOGLE, deviceInfo, clientIp);
+    return await this.handleOAuthLogin(profile, AuthProviderType.GOOGLE, deviceInfo);
   }
 
   public static excludePassword<T extends { password?: string | null }>(

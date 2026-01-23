@@ -19,7 +19,7 @@ export class AdminService {
   }
 
   static async getUserById(userId: string) {
-    const user = await UserRepository.findByIdWithLocations(userId, { password: false });
+    const user = await UserRepository.findById(userId, { password: false });
 
     if (!user) {
       throw ApiError.notFound('User not found');

@@ -27,16 +27,6 @@ export class UserRepository {
     });
   }
 
-  static async findByIdWithLocations(id: string, select?: SelectFields<User>) {
-    return await db.query.users.findFirst({
-      where: { id },
-      columns: normalizeSelect(select),
-      with: {
-        locations: true,
-      },
-    });
-  }
-
   static async update(id: string, data: Partial<InsertUser>, select?: SelectFields<User>) {
     const [updated] = await db
       .update(users)
