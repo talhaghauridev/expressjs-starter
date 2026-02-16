@@ -2,11 +2,13 @@ import { db } from '@/database/db';
 import { users, type InsertUser, type User } from '@/database/schema';
 import { SelectFields } from '@/types';
 import { buildReturning, normalizeSelect } from '@/utils/repository-helpers';
+import { Transaction } from '@/utils/transaction';
 import { and, eq, sql } from 'drizzle-orm';
 
 export class UserRepository {
-  static async create(data: InsertUser, select?: SelectFields<User>) {
-    const [user] = await db
+  static async create(data: InsertUser, select?: SelectFields<User>, tx?: Transaction) {
+    const dbClient = tx ?? db;
+    const [user] = await dbClient
       .insert(users)
       .values(data)
       .returning(buildReturning<User>(users, select));
@@ -37,8 +39,14 @@ export class UserRepository {
     });
   }
 
-  static async update(id: string, data: Partial<InsertUser>, select?: SelectFields<User>) {
-    const [updated] = await db
+  static async update(
+    id: string,
+    data: Partial<InsertUser>,
+    select?: SelectFields<User>,
+    tx?: Transaction
+  ) {
+    const dbClient = tx ?? db;
+    const [updated] = await dbClient
       .update(users)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -46,8 +54,9 @@ export class UserRepository {
     return updated as User;
   }
 
-  static async delete(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+  static async delete(id: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient.delete(users).where(eq(users.id, id));
   }
 
   static async findAll(

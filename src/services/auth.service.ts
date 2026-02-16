@@ -8,6 +8,7 @@ import {
   VerificationType,
 } from '@/constants/auth';
 import { ExpiryTime } from '@/constants/expiry';
+import { User } from '@/database/schema';
 import { env } from '@/env';
 import { SessionRepository } from '@/repositories/sessions.repository';
 import { UserLocationRepository } from '@/repositories/user-locations.repository';
@@ -18,6 +19,7 @@ import { DeviceInfo, formatDeviceInfo } from '@/utils/get-device-info';
 import { getLocationFromIp } from '@/utils/get-location';
 import { parseTimeToMs } from '@/utils/helpers';
 import { comparePassword, hashPassword } from '@/utils/password';
+import { withTransaction } from '@/utils/transaction';
 import { TokenService } from './token.service';
 import { VerificationService } from './verifications.service';
 
@@ -34,33 +36,49 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(password);
 
-    let user;
+    const { user, verificationToken } = await withTransaction(async (tx) => {
+      let user;
 
-    if (existingUser && !existingUser.isVerified) {
-      user = await UserRepository.update(
-        existingUser.id,
-        {
-          name,
-          password: hashedPassword,
-          createdAt: new Date(),
-          isVerified: false,
-        },
-        { password: false }
-      );
-    } else {
-      user = await UserRepository.create(
-        {
-          email,
-          password: hashedPassword,
-          name,
-          provider: AuthProviderType.CUSTOM,
-          isVerified: false,
-        },
-        { password: false }
-      );
-    }
+      if (existingUser && !existingUser.isVerified) {
+        user = await UserRepository.update(
+          existingUser.id,
+          {
+            name,
+            password: hashedPassword,
+            createdAt: new Date(),
+            isVerified: false,
+          },
+          { password: false },
+          tx
+        );
+      } else {
+        user = await UserRepository.create(
+          {
+            email,
+            password: hashedPassword,
+            name,
+            provider: AuthProviderType.CUSTOM,
+            isVerified: false,
+          },
+          { password: false },
+          tx
+        );
+      }
 
-    await VerificationService.sendVerification(user.id, user.email, deviceInfo.platform);
+      const verificationToken = await VerificationService.createVerificationToken(
+        user.id,
+        deviceInfo.platform,
+        tx
+      );
+
+      return { user, verificationToken };
+    });
+
+    await VerificationService.sendVerificationEmail(
+      user.email,
+      verificationToken,
+      deviceInfo.platform
+    );
 
     return {
       user,
@@ -140,18 +158,54 @@ export class AuthService {
       throw ApiError.badRequest('Please use the verification link sent to your email');
     }
 
-    const user = await UserRepository.update(
-      verification.userId,
-      { isVerified: true },
-      { password: false }
-    );
-    await VerificationRepository.deleteByToken(token);
+    const location = await getLocationFromIp(clientIp);
 
-    if (!user) {
-      throw ApiError.notFound('User not found');
-    }
+    const { user, refreshToken } = await withTransaction(async (tx) => {
+      const user = await UserRepository.update(
+        verification.userId,
+        { isVerified: true },
+        { password: false },
+        tx
+      );
 
-    const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
+      await VerificationRepository.deleteByToken(token, tx);
+
+      if (!user) {
+        throw ApiError.notFound('User not found');
+      }
+
+      const refreshToken = TokenService.generateRefreshToken();
+
+      await SessionRepository.create(
+        {
+          userId: user.id,
+          refreshToken,
+          deviceInfo: formatDeviceInfo(deviceInfo),
+          expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
+        },
+        { refreshToken: true },
+        tx
+      );
+
+      await UserLocationRepository.create(
+        {
+          userId: user.id,
+          type: LocationType.REGISTRATION,
+          country: location.country,
+          city: location.city,
+          ip: clientIp,
+          platform: deviceInfo.platform,
+          device: deviceInfo.device,
+          browser: deviceInfo.browser,
+        },
+        { userId: true },
+        tx
+      );
+
+      return { user, refreshToken };
+    });
+
+    const accessToken = TokenService.generateAccessToken({
       id: user.id,
       name: user.name,
       email: user.email,
@@ -159,34 +213,9 @@ export class AuthService {
       provider: user.provider,
     });
 
-    const location = await getLocationFromIp(clientIp);
-
-    const session = await SessionRepository.create(
-      {
-        userId: user.id,
-        refreshToken,
-        deviceInfo: formatDeviceInfo(deviceInfo),
-        expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
-      },
-      { refreshToken: true }
-    );
-
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { userId: true }
-    );
     return {
       accessToken,
-      refreshToken: session.refreshToken,
+      refreshToken,
       user,
     };
   }
@@ -218,19 +247,54 @@ export class AuthService {
       throw ApiError.badRequest('Please use the verification code sent to your email');
     }
 
-    const user = await UserRepository.update(
-      verification.userId,
-      { isVerified: true },
-      { password: false }
-    );
+    const location = await getLocationFromIp(clientIp);
 
-    await VerificationRepository.deleteByToken(otp);
+    const { user, refreshToken } = await withTransaction(async (tx) => {
+      const user = await UserRepository.update(
+        verification.userId,
+        { isVerified: true },
+        { password: false },
+        tx
+      );
 
-    if (!user) {
-      throw ApiError.notFound('User not found');
-    }
+      await VerificationRepository.deleteByToken(otp, tx);
 
-    const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
+      if (!user) {
+        throw ApiError.notFound('User not found');
+      }
+
+      const refreshToken = TokenService.generateRefreshToken();
+
+      await SessionRepository.create(
+        {
+          userId: user.id,
+          refreshToken,
+          deviceInfo: formatDeviceInfo(deviceInfo),
+          expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
+        },
+        { refreshToken: true },
+        tx
+      );
+
+      await UserLocationRepository.create(
+        {
+          userId: user.id,
+          type: LocationType.REGISTRATION,
+          country: location.country,
+          city: location.city,
+          ip: clientIp,
+          platform: deviceInfo.platform,
+          device: deviceInfo.device,
+          browser: deviceInfo.browser,
+        },
+        { userId: true },
+        tx
+      );
+
+      return { user, refreshToken };
+    });
+
+    const accessToken = TokenService.generateAccessToken({
       id: user.id,
       name: user.name,
       email: user.email,
@@ -238,35 +302,9 @@ export class AuthService {
       provider: user.provider,
     });
 
-    const location = await getLocationFromIp(clientIp);
-
-    const session = await SessionRepository.create(
-      {
-        userId: user.id,
-        refreshToken,
-        deviceInfo: formatDeviceInfo(deviceInfo),
-        expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
-      },
-      { refreshToken: true }
-    );
-
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { userId: true }
-    );
-
     return {
       accessToken,
-      refreshToken: session.refreshToken,
+      refreshToken,
       user,
     };
   }
@@ -440,8 +478,15 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(password);
 
-    await UserRepository.update(verification.userId, { password: hashedPassword }, { id: true });
-    await VerificationRepository.deleteByToken(token);
+    await withTransaction(async (tx) => {
+      await UserRepository.update(
+        verification.userId,
+        { password: hashedPassword },
+        { id: true },
+        tx
+      );
+      await VerificationRepository.deleteByToken(token, tx);
+    });
 
     return { message: 'Password reset successfully' };
   }
@@ -497,157 +542,153 @@ export class AuthService {
       password: false,
     });
 
+    const location = await getLocationFromIp(clientIp);
+    const locationData = {
+      country: location.country,
+      city: location.city,
+      ip: clientIp,
+      platform: deviceInfo.platform,
+      device: deviceInfo.device,
+      browser: deviceInfo.browser,
+    };
+
+    let user: User;
+    let refreshToken: string;
+
     if (existingUser) {
       if (!existingUser.isVerified && existingUser.provider === AuthProviderType.CUSTOM) {
-        const updatedUser = await UserRepository.update(
-          existingUser.id,
+        const result = await withTransaction(async (tx) => {
+          const updatedUser = await UserRepository.update(
+            existingUser.id,
+            {
+              provider,
+              providerId: normalized.providerId,
+              isVerified: true,
+              password: null,
+              name: normalized.name,
+              image: normalized.image,
+            },
+            { password: false },
+            tx
+          );
+
+          await VerificationRepository.deleteAllByUserId(existingUser.id, tx);
+
+          const refreshToken = TokenService.generateRefreshToken();
+
+          await SessionRepository.create(
+            {
+              userId: updatedUser.id,
+              refreshToken,
+              deviceInfo: formatDeviceInfo(deviceInfo),
+              expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
+            },
+            { refreshToken: true },
+            tx
+          );
+
+          await UserLocationRepository.create(
+            {
+              userId: updatedUser.id,
+              type: LocationType.REGISTRATION,
+              ...locationData,
+            },
+            { id: true },
+            tx
+          );
+
+          return { user: updatedUser, refreshToken };
+        });
+
+        user = result.user;
+        refreshToken = result.refreshToken;
+      } else {
+        if (existingUser.provider !== provider) {
+          const providerName = this.getProviderDisplayName(existingUser.provider);
+          throw ApiError.conflict(
+            `You have previously registered using ${providerName}. Please use the ${providerName} login option.`
+          );
+        }
+
+        refreshToken = await withTransaction(async (tx) => {
+          const refreshToken = TokenService.generateRefreshToken();
+
+          await SessionRepository.create(
+            {
+              userId: existingUser.id,
+              refreshToken,
+              deviceInfo: formatDeviceInfo(deviceInfo),
+              expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
+            },
+            { refreshToken: true },
+            tx
+          );
+
+          await UserLocationRepository.upsertLastLogin(
+            existingUser.id,
+            locationData,
+            { id: true },
+            tx
+          );
+
+          return refreshToken;
+        });
+
+        user = existingUser;
+      }
+    } else {
+      const result = await withTransaction(async (tx) => {
+        const newUser = await UserRepository.create(
           {
+            email: normalized.email,
+            name: normalized.name,
+            image: normalized.image,
+            password: null,
             provider,
             providerId: normalized.providerId,
             isVerified: true,
-            password: null,
-            name: normalized.name,
-            image: normalized.image,
           },
-          { password: false }
+          { password: false },
+          tx
         );
 
-        await VerificationRepository.deleteAllByUserId(existingUser.id);
+        await UserLocationRepository.create(
+          {
+            userId: newUser.id,
+            type: LocationType.REGISTRATION,
+            ...locationData,
+          },
+          { id: true },
+          tx
+        );
 
-        const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
-          id: updatedUser.id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          role: updatedUser.role,
-          provider: updatedUser.provider,
-        });
+        const refreshToken = TokenService.generateRefreshToken();
 
         await SessionRepository.create(
           {
-            userId: updatedUser.id,
+            userId: newUser.id,
             refreshToken,
             deviceInfo: formatDeviceInfo(deviceInfo),
             expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
           },
-          { refreshToken: true }
+          { refreshToken: true },
+          tx
         );
 
-        const location = await getLocationFromIp(clientIp);
-
-        await UserLocationRepository.create(
-          {
-            userId: updatedUser.id,
-            type: LocationType.REGISTRATION,
-            country: location.country,
-            city: location.city,
-            ip: clientIp,
-            platform: deviceInfo.platform,
-            device: deviceInfo.device,
-            browser: deviceInfo.browser,
-          },
-          { id: true }
-        );
-
-        return {
-          accessToken,
-          refreshToken,
-          user: updatedUser,
-        };
-      }
-
-      if (existingUser.provider !== provider) {
-        const providerName = this.getProviderDisplayName(existingUser.provider);
-        throw ApiError.conflict(
-          `You have previously registered using ${providerName}. Please use the ${providerName} login option.`
-        );
-      }
-
-      const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
-        id: existingUser.id,
-        name: existingUser.name,
-        email: existingUser.email,
-        role: existingUser.role,
-        provider: existingUser.provider,
+        return { user: newUser, refreshToken };
       });
 
-      await SessionRepository.create(
-        {
-          userId: existingUser.id,
-          refreshToken,
-          deviceInfo: formatDeviceInfo(deviceInfo),
-          expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
-        },
-        { refreshToken: true }
-      );
-
-      const location = await getLocationFromIp(clientIp);
-
-      await UserLocationRepository.upsertLastLogin(
-        existingUser.id,
-        {
-          country: location.country,
-          city: location.city,
-          ip: clientIp,
-          platform: deviceInfo.platform,
-          device: deviceInfo.device,
-          browser: deviceInfo.browser,
-        },
-        { id: true }
-      );
-
-      return {
-        accessToken,
-        refreshToken,
-        user: existingUser,
-      };
+      user = result.user;
+      refreshToken = result.refreshToken;
     }
 
-    const user = await UserRepository.create(
-      {
-        email: normalized.email,
-        name: normalized.name,
-        image: normalized.image,
-        password: null,
-        provider,
-        providerId: normalized.providerId,
-        isVerified: true,
-      },
-      { password: false }
-    );
-
-    const location = await getLocationFromIp(clientIp);
-
-    await UserLocationRepository.create(
-      {
-        userId: user.id,
-        type: LocationType.REGISTRATION,
-        country: location.country,
-        city: location.city,
-        ip: clientIp,
-        platform: deviceInfo.platform,
-        device: deviceInfo.device,
-        browser: deviceInfo.browser,
-      },
-      { id: true }
-    );
-
-    const { accessToken, refreshToken } = TokenService.generateAccessAndRefreshToken({
+    const accessToken = TokenService.generateAccessToken({
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       provider: user.provider,
     });
-
-    await SessionRepository.create(
-      {
-        userId: user.id,
-        refreshToken,
-        deviceInfo: formatDeviceInfo(deviceInfo),
-        expiresAt: new Date(Date.now() + parseTimeToMs(ExpiryTime.REFRESH_TOKEN)),
-      },
-      { refreshToken: true }
-    );
 
     return {
       accessToken,

@@ -2,11 +2,17 @@ import { db } from '@/database/db';
 import { sessions, type InsertSession, type Session } from '@/database/schema';
 import { SelectFields } from '@/types';
 import { buildReturning, normalizeSelect } from '@/utils/repository-helpers';
+import { Transaction } from '@/utils/transaction';
 import { and, eq, lt, sql } from 'drizzle-orm';
 
 export class SessionRepository {
-  static async create(data: InsertSession, select?: SelectFields<Session>): Promise<Session> {
-    const [session] = await db
+  static async create(
+    data: InsertSession,
+    select?: SelectFields<Session>,
+    tx?: Transaction
+  ): Promise<Session> {
+    const dbClient = tx ?? db;
+    const [session] = await dbClient
       .insert(sessions)
       .values(data)
       .returning(buildReturning(sessions, select));
@@ -29,16 +35,19 @@ export class SessionRepository {
     });
   }
 
-  static async deleteByRefreshToken(refreshToken: string): Promise<void> {
-    await db.delete(sessions).where(eq(sessions.refreshToken, refreshToken));
+  static async deleteByRefreshToken(refreshToken: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient.delete(sessions).where(eq(sessions.refreshToken, refreshToken));
   }
 
   static async update(
     sessionId: string,
     data: Partial<typeof sessions.$inferInsert>,
-    select?: SelectFields<Session>
+    select?: SelectFields<Session>,
+    tx?: Transaction
   ) {
-    const [updated] = await db
+    const dbClient = tx ?? db;
+    const [updated] = await dbClient
       .update(sessions)
       .set(data)
       .where(eq(sessions.id, sessionId))
@@ -47,27 +56,32 @@ export class SessionRepository {
     return updated as Session;
   }
 
-  static async deleteByUserId(userId: string): Promise<void> {
-    await db.delete(sessions).where(eq(sessions.userId, userId));
+  static async deleteByUserId(userId: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient.delete(sessions).where(eq(sessions.userId, userId));
   }
 
   static async deleteByUserIdExceptCurrent(
     userId: string,
-    currentRefreshToken: string
+    currentRefreshToken: string,
+    tx?: Transaction
   ): Promise<void> {
-    await db
+    const dbClient = tx ?? db;
+    await dbClient
       .delete(sessions)
       .where(
         and(eq(sessions.userId, userId), sql`${sessions.refreshToken} != ${currentRefreshToken}`)
       );
   }
 
-  static async deleteById(sessionId: string) {
-    await db.delete(sessions).where(eq(sessions.id, sessionId));
+  static async deleteById(sessionId: string, tx?: Transaction) {
+    const dbClient = tx ?? db;
+    await dbClient.delete(sessions).where(eq(sessions.id, sessionId));
   }
 
-  static async deleteAllByUserId(userId: string) {
-    await db.delete(sessions).where(eq(sessions.userId, userId));
+  static async deleteAllByUserId(userId: string, tx?: Transaction) {
+    const dbClient = tx ?? db;
+    await dbClient.delete(sessions).where(eq(sessions.userId, userId));
   }
 
   static async deleteExpired(): Promise<void> {

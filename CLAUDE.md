@@ -33,6 +33,7 @@ This is an Express.js REST API template built with TypeScript, featuring compreh
 ### File Naming Conventions
 
 This codebase follows **strict kebab-case naming** for all files with descriptive suffixes indicating file purpose:
+
 - Controllers: `*.controller.ts` (e.g., `users.controller.ts`)
 - Services: `*.service.ts` (e.g., `auth.service.ts`)
 - Repositories: `*.repository.ts` (e.g., `users.repository.ts`)

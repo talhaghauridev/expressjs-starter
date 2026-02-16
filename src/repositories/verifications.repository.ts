@@ -2,11 +2,17 @@ import { db } from '@/database/db';
 import { verifications, type InsertVerification, type Verification } from '@/database/schema';
 import { SelectFields } from '@/types';
 import { buildReturning, normalizeSelect } from '@/utils/repository-helpers';
+import { Transaction } from '@/utils/transaction';
 import { and, eq } from 'drizzle-orm';
 
 export class VerificationRepository {
-  static async create(data: InsertVerification, select?: SelectFields<Verification>) {
-    const [verification] = await db
+  static async create(
+    data: InsertVerification,
+    select?: SelectFields<Verification>,
+    tx?: Transaction
+  ) {
+    const dbClient = tx ?? db;
+    const [verification] = await dbClient
       .insert(verifications)
       .values(data)
       .returning(buildReturning(verifications, select));
@@ -19,32 +25,33 @@ export class VerificationRepository {
     type: string,
     platform: string,
     token: string,
-    expiresAt: Date
+    expiresAt: Date,
+    tx?: Transaction
   ) {
-    return await db.transaction(async (trx) => {
-      await trx
-        .delete(verifications)
-        .where(
-          and(
-            eq(verifications.userId, userId),
-            eq(verifications.type, type as any),
-            eq(verifications.platform, platform as any)
-          )
-        );
+    const dbClient = tx ?? db;
 
-      const [verification] = await trx
-        .insert(verifications)
-        .values({
-          userId,
-          type: type as any,
-          platform: platform as any,
-          token,
-          expiresAt,
-        })
-        .returning();
+    await dbClient
+      .delete(verifications)
+      .where(
+        and(
+          eq(verifications.userId, userId),
+          eq(verifications.type, type as any),
+          eq(verifications.platform, platform as any)
+        )
+      );
 
-      return verification;
-    });
+    const [verification] = await dbClient
+      .insert(verifications)
+      .values({
+        userId,
+        type: type as any,
+        platform: platform as any,
+        token,
+        expiresAt,
+      })
+      .returning();
+
+    return verification;
   }
 
   static async findByToken(token: string, select?: SelectFields<Verification>) {
@@ -91,19 +98,24 @@ export class VerificationRepository {
     });
   }
 
-  static async deleteByToken(token: string): Promise<void> {
-    await db.delete(verifications).where(eq(verifications.token, token));
+  static async deleteByToken(token: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient.delete(verifications).where(eq(verifications.token, token));
   }
 
-  static async deleteByUserId(userId: string): Promise<void> {
-    await db.delete(verifications).where(eq(verifications.userId, userId));
-  }
-  static async deleteAllByUserId(userId: string) {
-    await db.delete(verifications).where(eq(verifications.userId, userId));
+  static async deleteByUserId(userId: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient.delete(verifications).where(eq(verifications.userId, userId));
   }
 
-  static async deleteByUserAndType(userId: string, type: string): Promise<void> {
-    await db
+  static async deleteAllByUserId(userId: string, tx?: Transaction) {
+    const dbClient = tx ?? db;
+    await dbClient.delete(verifications).where(eq(verifications.userId, userId));
+  }
+
+  static async deleteByUserAndType(userId: string, type: string, tx?: Transaction): Promise<void> {
+    const dbClient = tx ?? db;
+    await dbClient
       .delete(verifications)
       .where(and(eq(verifications.userId, userId), eq(verifications.type, type)));
   }

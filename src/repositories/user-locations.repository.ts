@@ -3,11 +3,17 @@ import { db } from '@/database/db';
 import { userLocations, type InsertUserLocation, type UserLocation } from '@/database/schema';
 import { SelectFields } from '@/types';
 import { buildReturning, normalizeSelect } from '@/utils/repository-helpers';
+import { Transaction } from '@/utils/transaction';
 import { eq } from 'drizzle-orm';
 
 export class UserLocationRepository {
-  static async create(data: InsertUserLocation, select?: SelectFields<UserLocation>) {
-    const [location] = await db
+  static async create(
+    data: InsertUserLocation,
+    select?: SelectFields<UserLocation>,
+    tx?: Transaction
+  ) {
+    const dbClient = tx ?? db;
+    const [location] = await dbClient
       .insert(userLocations)
       .values(data)
       .returning(buildReturning(userLocations, select));
@@ -18,9 +24,10 @@ export class UserLocationRepository {
   static async upsertLastLogin(
     userId: string,
     locationData: Omit<InsertUserLocation, 'userId' | 'type'>,
-    select?: SelectFields<UserLocation>
+    select?: SelectFields<UserLocation>,
+    tx?: Transaction
   ) {
-    return await db.transaction(async (trx) => {
+    const execute = async (trx: Transaction) => {
       const existing = await trx.query.userLocations.findFirst({
         where: {
           userId,
@@ -55,7 +62,13 @@ export class UserLocationRepository {
         .returning(buildReturning(userLocations, select));
 
       return created;
-    });
+    };
+
+    if (tx) {
+      return await execute(tx);
+    }
+
+    return await db.transaction(execute);
   }
 
   static async findByUserId(userId: string, select?: SelectFields<UserLocation>) {

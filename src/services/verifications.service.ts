@@ -4,6 +4,7 @@ import { env } from '@/env';
 import { VerificationRepository } from '@/repositories/verifications.repository';
 import { parseTimeToMs } from '@/utils/helpers';
 import { sendEmail } from '@/utils/send-email';
+import { Transaction } from '@/utils/transaction';
 import crypto from 'crypto';
 
 const generateSecureOTP = (): string => {
@@ -13,6 +14,54 @@ const generateSecureOTP = (): string => {
 };
 
 export class VerificationService {
+  static async createVerificationToken(
+    userId: string,
+    platform: (typeof AvailablePlatforms)[number],
+    tx?: Transaction
+  ) {
+    const token =
+      platform === PlatformType.WEB ? crypto.randomBytes(32).toString('hex') : generateSecureOTP();
+
+    const expiryTime =
+      platform === PlatformType.WEB
+        ? ExpiryTime.EMAIL_VERIFICATION_LINK
+        : ExpiryTime.EMAIL_VERIFICATION_OTP;
+
+    const expiresAt = new Date(Date.now() + parseTimeToMs(expiryTime));
+
+    await VerificationRepository.createVerification(
+      userId,
+      VerificationType.EMAIL,
+      platform,
+      token,
+      expiresAt,
+      tx
+    );
+
+    return token;
+  }
+
+  static async sendVerificationEmail(
+    email: string,
+    token: string,
+    platform: (typeof AvailablePlatforms)[number]
+  ) {
+    if (platform === PlatformType.WEB) {
+      const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
+      await sendEmail({
+        to: email,
+        subject: 'Verify Your Email Address',
+        text: `Click this link to verify your email: ${verificationUrl}`,
+      });
+    } else {
+      await sendEmail({
+        to: email,
+        subject: 'Your Verification Code',
+        text: `Your verification code is: ${token}`,
+      });
+    }
+  }
+
   static async sendVerification(
     userId: string,
     email: string,
@@ -62,6 +111,53 @@ export class VerificationService {
       subject: 'Your Verification Code',
       text: `Your verification code is: ${otp}`,
     });
+  }
+
+  static async createPasswordResetToken(
+    userId: string,
+    platform: (typeof AvailablePlatforms)[number],
+    tx?: Transaction
+  ) {
+    const token =
+      platform === PlatformType.WEB ? crypto.randomBytes(32).toString('hex') : generateSecureOTP();
+
+    const expiryTime =
+      platform === PlatformType.WEB
+        ? ExpiryTime.EMAIL_VERIFICATION_LINK
+        : ExpiryTime.EMAIL_VERIFICATION_OTP;
+
+    const expiresAt = new Date(Date.now() + parseTimeToMs(expiryTime));
+
+    await VerificationRepository.createVerification(
+      userId,
+      VerificationType.PASSWORD_RESET,
+      platform,
+      token,
+      expiresAt,
+      tx
+    );
+
+    return token;
+  }
+
+  static async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    platform: (typeof AvailablePlatforms)[number]
+  ) {
+    if (platform === PlatformType.WEB) {
+      await sendEmail({
+        to: email,
+        subject: 'Reset Your Password',
+        text: `Click this link to reset your password: ${env.FRONTEND_URL}/reset-password?token=${token}`,
+      });
+    } else {
+      await sendEmail({
+        to: email,
+        subject: 'Your Password Reset Code',
+        text: `Your password reset code is: ${token}`,
+      });
+    }
   }
 
   static async sendPasswordReset(
