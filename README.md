@@ -1,4 +1,4 @@
-# expressjs-template
+# Expressjs Template
 
 To install dependencies:
 
