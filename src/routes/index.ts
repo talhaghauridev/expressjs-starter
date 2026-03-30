@@ -2,9 +2,11 @@ import express from 'express';
 import authRoutes from './auth.route';
 import usersRoutes from './users.route';
 import adminRoutes from './admin.route';
+import healthRoutes from './health.route';
 
 const routes = express.Router();
 
+routes.use('/health', healthRoutes);
 routes.use('/auth', authRoutes);
 routes.use('/users', usersRoutes);
 routes.use('/admin', adminRoutes);
