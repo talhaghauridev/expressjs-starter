@@ -34,18 +34,20 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().nonempty(),
   CLOUDINARY_API_KEY: z.string().nonempty(),
   CLOUDINARY_API_SECRET: z.string().nonempty(),
-
-  REDIS_HOST: z.string().default('localhost'),
-  REDIS_PORT: z.string().default('6379'),
-  REDIS_PASSWORD: z.string().optional(),
-  REDIS_URL: z.string().nonempty(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
-  console.log('Environment variables validation failed: ', parsedEnv.error.issues);
-  throw new Error('There is an error with the environment variables. ');
+  const details = parsedEnv.error.issues.map((issue) => {
+    const key = issue.path.join('.');
+    const received = process.env[key];
+    const value =
+      received === undefined ? 'missing' : received === '' ? 'empty string' : `"${received}"`;
+    return `  - ${key}: ${issue.message} (got ${value})`;
+  });
+  console.error(`Invalid environment variables:\n${details.join('\n')}`);
+  process.exit(1);
 }
 
 export const env = {
