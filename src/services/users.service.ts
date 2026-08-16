@@ -3,10 +3,10 @@ import { User } from '@/database/schema';
 import { SessionRepository } from '@/repositories/sessions.repository';
 import { UserRepository } from '@/repositories/users.repository';
 import ApiError from '@/utils/api-error';
+import { getUpdatedFields, isEmptyObject } from '@/utils/helpers';
 import { comparePassword, hashPassword } from '@/utils/password';
 import { StorageService } from './storage.service';
-import { getUpdatedFields, isEmptyObject } from '@/utils/helpers';
-export class UsersService {
+export class UserService {
   static async getProfile(userId: string) {
     const user = await UserRepository.findById(userId, { password: false });
 
