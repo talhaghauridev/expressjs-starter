@@ -2,23 +2,7 @@ import { HTTP_STATUS } from './http-status';
 import { ApiMessages } from '@/constants/api-messages';
 import { Response } from 'express';
 
-class ApiResponse<T> {
-  success: boolean;
-  statusCode: number;
-  message: string;
-  data: T;
-
-  constructor(
-    statusCode: number = HTTP_STATUS.OK,
-    data: T,
-    message: string = ApiMessages.SUCCESS.SUCCESS
-  ) {
-    this.success = statusCode < 400;
-    this.statusCode = statusCode;
-    this.message = message;
-    this.data = data;
-  }
-
+class ApiResponse {
   static success<T>(res: Response, data: T, message: string = ApiMessages.SUCCESS.SUCCESS) {
     return res.status(HTTP_STATUS.OK).json({
       success: true,
