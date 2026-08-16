@@ -127,6 +127,27 @@ HTTP <-> service.
   `*.config.ts`.
 - **File name = plural resource** (`users.service.ts`), **class name = singular**
   (`UserService`, `UserRepository`). Keep this pairing for new entities — don't mix.
+## Constants
+
+- **Never use TypeScript `enum`.** Always use a plain object with `as const` — it's
+  erased at compile time (no runtime footprint), and its values are usable directly
+  where a string is expected without an `enum`'s casting friction:
+
+  ```ts
+  // Wrong
+  enum UserRole {
+    Admin = 'admin',
+    User = 'user',
+  }
+
+  // Right
+  export const UserRoles = { ADMIN: 'admin', USER: 'user' } as const;
+  ```
+
+- **Enum-like object** (you index into it, `X.Y`) → object name `PascalCase`, inner keys
+  `SCREAMING_SNAKE_CASE`: `UserRoles.ADMIN`, `CacheKeyPrefix.USERS`, `ExpiryTime.ACCESS_TOKEN`.
+- **Standalone primitive** (no dot, used directly) → `SCREAMING_SNAKE_CASE`:
+  `MAX_RETRIES`, `DEFAULT_TIMEOUT_MS`.
 
 ## Import aliases
 
