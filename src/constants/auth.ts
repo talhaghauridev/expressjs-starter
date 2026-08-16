@@ -1,4 +1,4 @@
-const CACHE_KEY_PREFIX = {
+const CacheKeyPrefix = {
   USERS: 'users',
   SESSIONS: 'sessions',
 } as const;
@@ -44,16 +44,16 @@ const AvailableUserRoles = Object.values(UserRoles);
 const AvailableLocationTypes = Object.values(LocationType);
 
 export {
-  CACHE_KEY_PREFIX,
+  AuthCallbacks,
   AuthProviderType,
   AvailableAuthProviders,
-  AvailableVerifications,
-  VerificationType,
-  AuthCallbacks,
+  AvailableLocationTypes,
   AvailablePlatforms,
+  AvailableUserRoles,
+  AvailableVerifications,
+  CacheKeyPrefix,
+  LocationType,
   PlatformType,
   UserRoles,
-  AvailableUserRoles,
-  LocationType,
-  AvailableLocationTypes,
+  VerificationType,
 };
